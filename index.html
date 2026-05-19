@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crunch — Media Compressor & Editor</title>
+
+<script src="coi-serviceworker.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --bg:#0c0c0e; --bg-card:#151518; --bg-hover:#1e1e23;
+  --border:#2a2a30; --border-hi:#3d3d45;
+  --text:#e4e4e8; --text-dim:#8a8a96;
+  --accent:#c8ff32; --accent-dim:#9abf26;
+  --red:#ff4f5e; --orange:#ffa64d;
+  --sans:'DM Sans',sans-serif; --mono:'JetBrains Mono',monospace;
+  --radius:10px; --radius-lg:16px;
+}
+
+html{font-size:15px}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+
+/* Layout */
+.app{max-width:920px;margin:0 auto;padding:2rem 1.25rem 4rem}
+header{display:flex;align-items:center;gap:.75rem;margin-bottom:2.5rem}
+header .logo{width:38px;height:38px;background:var(--accent);border-radius:8px;display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:1.15rem;color:var(--bg);flex-shrink:0}
+header h1{font-size:1.6rem;font-weight:700;letter-spacing:-0.03em}
+header p{color:var(--text-dim);font-size:.85rem;margin-left:auto;text-align:right}
+
+/* Drop Zone */
+.dropzone{border:2px dashed var(--border);border-radius:var(--radius-lg);padding:3.5rem 2rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative}
+.dropzone:hover,.dropzone.dragover{border-color:var(--accent);background:rgba(200,255,50,.03)}
+.dropzone .icon{font-size:2.5rem;margin-bottom:.75rem}
+.dropzone .primary{font-size:1.05rem;font-weight:500}
+.dropzone .secondary{color:var(--text-dim);font-size:.82rem;margin-top:.35rem}
+.dropzone input{display:none}
+
+/* Card */
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1rem;animation:fadeIn .35s ease}
+.card h2{font-size:.95rem;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+.card h2 .badge{font-family:var(--mono);font-size:.65rem;background:var(--bg-hover);border:1px solid var(--border);border-radius:4px;padding:.15rem .45rem;color:var(--text-dim);font-weight:400}
+
+/* File Info */
+.file-info{display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;background:var(--bg-hover);border-radius:var(--radius);margin-bottom:1rem;flex-wrap:wrap}
+.file-info .name{font-family:var(--mono);font-size:.82rem;font-weight:600;word-break:break-all}
+.file-info .meta{color:var(--text-dim);font-size:.78rem;font-family:var(--mono)}
+.file-info .remove-btn{margin-left:auto;background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:6px;padding:.3rem .65rem;cursor:pointer;font-size:.75rem;transition:all .15s}
+.file-info .remove-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* Preview */
+.preview-wrap{position:relative;width:100%;border-radius:var(--radius);overflow:hidden;background:#000;margin-bottom:1rem}
+.preview-wrap video,.preview-wrap audio{width:100%;display:block;max-height:420px;object-fit:contain}
+
+/* Crop */
+.crop-container{position:relative;display:inline-block;width:100%}
+.crop-overlay{position:absolute;top:0;left:0;right:0;bottom:0;cursor:crosshair;z-index:5}
+.crop-rect{position:absolute;border:2px solid var(--accent);box-shadow:0 0 0 9999px rgba(0,0,0,.55);z-index:6;pointer-events:none}
+.crop-dims{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.7);color:var(--accent);font-family:var(--mono);font-size:.7rem;padding:2px 6px;border-radius:4px;z-index:7}
+
+/* Sliders */
+.slider-group{margin-bottom:1rem}
+.slider-group label{display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:.35rem}
+.slider-group label span{color:var(--text-dim);font-family:var(--mono)}
+input[type=range]{-webkit-appearance:none;width:100%;height:6px;background:var(--border);border-radius:3px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;background:var(--accent);border-radius:50%;cursor:grab;border:2px solid var(--bg);box-shadow:0 0 6px rgba(200,255,50,.3)}
+
+/* Trim */
+.trim-bar{position:relative;height:40px;background:var(--bg-hover);border-radius:var(--radius);margin-bottom:.5rem;overflow:hidden}
+.trim-bar .fill{position:absolute;top:0;bottom:0;background:rgba(200,255,50,.12);border-left:3px solid var(--accent);border-right:3px solid var(--accent);pointer-events:none}
+.trim-bar .handle{position:absolute;top:0;bottom:0;width:14px;background:var(--accent);cursor:ew-resize;z-index:3;border-radius:3px;display:grid;place-items:center}
+.trim-bar .handle::after{content:'‖';font-size:.6rem;color:var(--bg);font-weight:700}
+.trim-bar .handle.left{left:0}
+.trim-bar .handle.right{right:0}
+.trim-times{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.75rem;color:var(--text-dim);margin-bottom:1rem}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:.45rem;font-family:var(--sans);font-size:.88rem;font-weight:600;border:none;border-radius:var(--radius);padding:.7rem 1.5rem;cursor:pointer;transition:all .15s}
+.btn-primary{background:var(--accent);color:var(--bg)}
+.btn-primary:hover{background:var(--accent-dim)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-secondary{background:var(--bg-hover);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{border-color:var(--border-hi);background:var(--border)}
+.actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
+
+/* Progress */
+.progress-wrap{margin-top:1rem}
+.progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.progress-bar .fill{height:100%;background:var(--accent);width:0%;transition:width .2s;border-radius:4px}
+.progress-label{font-family:var(--mono);font-size:.75rem;color:var(--text-dim);margin-top:.3rem}
+
+/* Status */
+.status{padding:.65rem 1rem;border-radius:var(--radius);font-size:.82rem;margin-top:.75rem}
+.status.success{background:rgba(200,255,50,.08);color:var(--accent);border:1px solid rgba(200,255,50,.2)}
+.status.error{background:rgba(255,79,94,.08);color:var(--red);border:1px solid rgba(255,79,94,.2)}
+.status.info{background:rgba(255,166,77,.06);color:var(--orange);border:1px solid rgba(255,166,77,.15)}
+
+/* Toggle / Check */
+.toggle-row{display:flex;gap:.5rem;margin-bottom:1rem}
+.toggle-row button{flex:1;padding:.55rem;font-family:var(--sans);font-size:.82rem;font-weight:500;background:var(--bg-hover);color:var(--text-dim);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all .15s}
+.toggle-row button.active{background:rgba(200,255,50,.08);color:var(--accent);border-color:var(--accent)}
+.check-row{display:flex;align-items:center;gap:.5rem;font-size:.82rem;margin-bottom:.75rem}
+.check-row input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
+
+.hidden{display:none !important}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(max-width:600px){.app{padding:1.25rem .75rem 3rem}header h1{font-size:1.25rem}header p{display:none}.dropzone{padding:2.5rem 1rem}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">C</div>
+    <h1>Crunch</h1>
+    <p>Client-side media compressor &amp; editor — nothing leaves your device.</p>
+  </header>
+
+  <div class="dropzone" id="dropzone">
+    <div class="icon">📂</div>
+    <div class="primary">Drop a video or audio file here</div>
+    <div class="secondary">MP4 · MKV · WEBM · MOV · AVI · MP3 · WAV · OGG · FLAC — up to 2 GB</div>
+    <input type="file" id="fileInput" accept="video/*,audio/*,.mkv,.avi,.flac,.ogg,.wav">
+  </div>
+
+  <div id="editor" class="hidden">
+
+    <div class="file-info" id="fileInfo">
+      <span class="name" id="fileName"></span>
+      <span class="meta" id="fileMeta"></span>
+      <button class="remove-btn" id="removeBtn">✕ Remove</button>
+    </div>
+
+    <div class="card">
+      <h2>Preview</h2>
+      <div class="preview-wrap" id="previewWrap">
+        <div class="crop-container" id="cropContainer">
+          <video id="videoEl" controls></video>
+          <audio id="audioEl" controls class="hidden"></audio>
+          <div id="cropOverlay" class="crop-overlay hidden"></div>
+          <div id="cropRect" class="crop-rect hidden"></div>
+          <div id="cropDims" class="crop-dims hidden"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="toggle-row" id="modeToggle">
+      <button class="active" data-mode="compress">Compress</button>
+      <button data-mode="trim">Trim</button>
+      <button data-mode="crop" id="cropModeBtn">Crop</button>
+    </div>
+
+    <div class="card" id="panelCompress">
+      <h2>Compression <span class="badge" id="codecBadge">H.264</span></h2>
+      
+      <div class="slider-group">
+        <label>Compression Level <span id="compPctVal">50%</span></label>
+        <input type="range" id="compSlider" min="0" max="100" value="50">
+        <div id="compExactVal" style="font-family:var(--mono); font-size:.75rem; color:var(--text-dim); text-align:right; margin-top:.35rem;">(CRF: 26)</div>
+      </div>
+
+      <div class="check-row" id="stripAudioRow">
+        <input type="checkbox" id="stripAudio">
+        <label for="stripAudio">Remove audio track</label>
+      </div>
+    </div>
+
+    <div class="card hidden" id="panelTrim">
+      <h2>Trim</h2>
+      <div class="trim-bar" id="trimBar">
+        <div class="fill" id="trimFill"></div>
+        <div class="handle left" id="trimLeft"></div>
+        <div class="handle right" id="trimRight"></div>
+      </div>
+      <div class="trim-times">
+        <span id="trimStart">00:00.0</span>
+        <span id="trimEnd">00:00.0</span>
+      </div>
+    </div>
+
+    <div class="card hidden" id="panelCrop">
+      <h2>Crop</h2>
+      <p style="color:var(--text-dim);font-size:.82rem;margin-bottom:.5rem">Click and drag on the video preview to define a crop region.</p>
+      <div class="check-row">
+        <input type="checkbox" id="cropEnabled">
+        <label for="cropEnabled">Enable crop</label>
+      </div>
+      <div id="cropInfo" class="status info hidden" style="margin-top:0"></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="processBtn" disabled>⏳ Loading engine…</button>
+      <button class="btn btn-secondary hidden" id="downloadBtn">⬇ Download</button>
+      <button class="btn btn-secondary hidden" id="reuseBtn">↻ Use output as new input</button>
+    </div>
+
+    <div class="progress-wrap hidden" id="progressWrap">
+      <div class="progress-bar"><div class="fill" id="progressFill"></div></div>
+      <div class="progress-label" id="progressLabel">Initializing…</div>
+    </div>
+
+    <div id="statusMsg" class="hidden"></div>
+  </div>
+
+</div>
+
+<script type="module">
+// ── Imports (Pulling from UMD window globals to bypass ESM CORS) ──
+const { FFmpeg } = window.FFmpegWASM;
+const { toBlobURL } = window.FFmpegUtil;
+
+// ── DOM refs ────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const dropzone      = $('dropzone');
+const fileInput     = $('fileInput');
+const editor        = $('editor');
+const fileNameEl    = $('fileName');
+const fileMetaEl    = $('fileMeta');
+const removeBtn     = $('removeBtn');
+const videoEl       = $('videoEl');
+const audioEl       = $('audioEl');
+const compSlider    = $('compSlider');
+const compPctVal    = $('compPctVal');
+const compExactVal  = $('compExactVal');
+const codecBadge    = $('codecBadge');
+const stripAudioRow = $('stripAudioRow');
+const stripAudio    = $('stripAudio');
+const trimBar       = $('trimBar');
+const trimFill      = $('trimFill');
+const trimLeft      = $('trimLeft');
+const trimRight     = $('trimRight');
+const trimStartEl   = $('trimStart');
+const trimEndEl     = $('trimEnd');
+const cropOverlay   = $('cropOverlay');
+const cropRect      = $('cropRect');
+const cropDims      = $('cropDims');
+const cropEnabled   = $('cropEnabled');
+const cropInfo      = $('cropInfo');
+const cropModeBtn   = $('cropModeBtn');
+const processBtn    = $('processBtn');
+const downloadBtn   = $('downloadBtn');
+const reuseBtn      = $('reuseBtn');
+const progressWrap  = $('progressWrap');
+const progressFill  = $('progressFill');
+const progressLabel = $('progressLabel');
+const statusMsg     = $('statusMsg');
+
+const panels = {
+  compress: $('panelCompress'),
+  trim:     $('panelTrim'),
+  crop:     $('panelCrop'),
+};
+
+// ── State ───────────────────────────────────────────────────────
+let currentFile = null;
+let mediaType   = 'video';
+let duration    = 0;
+let activeMode  = 'compress';
+let trimValues  = { start: 0, end: 1 };
+let cropBox     = null;
+let videoNatW   = 0, videoNatH = 0;
+let outputBlob  = null;
+let engineReady = false;
+
+const audioBitrates = [320, 256, 224, 192, 160, 128, 112, 96, 80, 64, 48, 40, 32, 24, 16, 8];
+
+// ── FFmpeg instance (main thread) ───────────────────────────────
+const ffmpeg = new FFmpeg();
+
+ffmpeg.on('log', ({ message }) => {
+  console.log('[ffmpeg]', message);
+});
+
+ffmpeg.on('progress', ({ progress }) => {
+  const pct = Math.round(Math.max(0, Math.min(1, progress)) * 100);
+  progressFill.style.width = pct + '%';
+  progressLabel.textContent = `Processing… ${pct}%`;
+});
+
+// ── Load the engine (core files served safely from same-origin root) ────────
+async function loadEngine() {
+  try {
+    showStatus('Downloading engine (~31 MB on first load)…', 'info');
+
+    const base = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/');
+    
+    const coreURL = await toBlobURL(base + 'ffmpeg-core.js', 'text/javascript');
+    const wasmURL = await toBlobURL(base + 'ffmpeg-core.wasm', 'application/wasm');
+    const workerURL = await toBlobURL('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js', 'text/javascript');
+
+    await ffmpeg.load({ 
+        coreURL, 
+        wasmURL, 
+        classWorkerURL: workerURL 
+    });
+
+    engineReady = true;
+    processBtn.textContent = '⚙ Process';
+    if (currentFile) processBtn.disabled = false;
+    showStatus('Engine ready.', 'info');
+    console.log('[Crunch] FFmpeg engine loaded');
+  } catch (err) {
+    console.error('[Crunch] Engine load failed:', err);
+    showStatus('Engine failed to load: ' + err.message, 'error');
+  }
+}
+
+loadEngine();
+
+const ioWorker = new Worker('worker.js');
+
+// ── Helpers ─────────────────────────────────────────────────────
+function fmtSize(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+  return (b / 1048576).toFixed(1) + ' MB';
+}
+function fmtTime(s) {
+  const m = Math.floor(s / 60);
+  const sec = (s % 60).toFixed(1);
+  return `${String(m).padStart(2, '0')}:${sec.padStart(4, '0')}`;
+}
+function fmtTimecode(s) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = (s % 60).toFixed(3);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${sec.padStart(6, '0')}`;
+}
+function showStatus(msg, type) {
+  statusMsg.className = 'status ' + type;
+  statusMsg.textContent = msg;
+  statusMsg.classList.remove('hidden');
+}
+
+// ── File Handling ───────────────────────────────────────────────
+function handleFile(file) {
+  if (!file) return;
+  currentFile = file;
+  outputBlob  = null;
+  downloadBtn.classList.add('hidden');
+  reuseBtn.classList.add('hidden');
+  statusMsg.classList.add('hidden');
+
+  mediaType = file.type.startsWith('audio') ? 'audio' : 'video';
+
+  fileNameEl.textContent = file.name;
+  fileMetaEl.textContent = fmtSize(file.size);
+  dropzone.classList.add('hidden');
+  editor.classList.remove('hidden');
+
+  cropModeBtn.classList.toggle('hidden', mediaType === 'audio');
+  stripAudioRow.classList.toggle('hidden', mediaType === 'audio');
+
+  compSlider.value = 50;
+  updateCompressionUI();
+
+  const previewURL = URL.createObjectURL(file);
+
+  if (mediaType === 'video') {
+    audioEl.classList.add('hidden');
+    videoEl.classList.remove('hidden');
+    videoEl.src = previewURL;
+    videoEl.onloadedmetadata = () => {
+      duration = videoEl.duration;
+      videoNatW = videoEl.videoWidth;
+      videoNatH = videoEl.videoHeight;
+      trimValues = { start: 0, end: 1 };
+      updateTrimUI();
+      codecBadge.textContent = 'H.264';
+      processBtn.disabled = !engineReady;
+    };
+  } else {
+    videoEl.classList.add('hidden');
+    audioEl.classList.remove('hidden');
+    audioEl.src = previewURL;
+    audioEl.onloadedmetadata = () => {
+      duration = audioEl.duration;
+      trimValues = { start: 0, end: 1 };
+      updateTrimUI();
+      codecBadge.textContent = 'MP3';
+      processBtn.disabled = !engineReady;
+    };
+  }
+
+  cropBox = null;
+  cropEnabled.checked = false;
+  cropRect.classList.add('hidden');
+  cropDims.classList.add('hidden');
+  cropInfo.classList.add('hidden');
+  setMode('compress');
+}
+
+dropzone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', e => { e.preventDefault(); dropzone.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
+
+removeBtn.addEventListener('click', () => {
+  currentFile = null;
+  outputBlob  = null;
+  editor.classList.add('hidden');
+  dropzone.classList.remove('hidden');
+  videoEl.src = '';
+  audioEl.src = '';
+  fileInput.value = '';
+});
+
+// ── Mode Toggle ─────────────────────────────────────────────────
+function setMode(mode) {
+  activeMode = mode;
+  document.querySelectorAll('#modeToggle button').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === mode));
+  Object.entries(panels).forEach(([k, p]) => p.classList.toggle('hidden', k !== mode));
+  const showCrop = mode === 'crop' && mediaType === 'video';
+  cropOverlay.classList.toggle('hidden', !showCrop);
+  if (!showCrop) { cropRect.classList.add('hidden'); cropDims.classList.add('hidden'); }
+  else if (cropBox) drawCropRect();
+}
+document.querySelectorAll('#modeToggle button').forEach(b =>
+  b.addEventListener('click', () => setMode(b.dataset.mode)));
+
+// ── Compression Slider Logic ────────────────────────────────────
+function updateCompressionUI() {
+  const val = parseInt(compSlider.value, 10);
+  compPctVal.textContent = val + '%';
+  
+  if (mediaType === 'video') {
+    const crf = Math.round((val / 100) * 51);
+    compExactVal.textContent = `(CRF: ${crf})`;
+  } else {
+    const idx = Math.round((val / 100) * (audioBitrates.length - 1));
+    compExactVal.textContent = `(Bitrate: ${audioBitrates[idx]} kbps)`;
+  }
+}
+compSlider.addEventListener('input', updateCompressionUI);
+
+// ── Trim Handles ────────────────────────────────────────────────
+function updateTrimUI() {
+  const lp = trimValues.start * 100;
+  const rp = trimValues.end * 100;
+  trimLeft.style.left  = `calc(${lp}% - 7px)`;
+  trimRight.style.left = `calc(${rp}% - 7px)`;
+  trimFill.style.left  = lp + '%';
+  trimFill.style.width = (rp - lp) + '%';
+  trimStartEl.textContent = fmtTime(trimValues.start * duration);
+  trimEndEl.textContent   = fmtTime(trimValues.end * duration);
+}
+
+function makeDraggable(handle, isLeft) {
+  let dragging = false;
+  const onMove = e => {
+    if (!dragging) return;
+    const rect = trimBar.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    let frac = (clientX - rect.left) / rect.width;
+    frac = Math.max(0, Math.min(1, frac));
+    if (isLeft) trimValues.start = Math.min(frac, trimValues.end - 0.01);
+    else        trimValues.end   = Math.max(frac, trimValues.start + 0.01);
+    updateTrimUI();
+  };
+  const onUp = () => {
+    dragging = false;
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onUp);
+  };
+  handle.addEventListener('mousedown', e => { e.preventDefault(); dragging = true; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp); });
+  handle.addEventListener('touchstart', e => { e.preventDefault(); dragging = true; document.addEventListener('touchmove', onMove, { passive: false }); document.addEventListener('touchend', onUp); });
+}
+makeDraggable(trimLeft, true);
+makeDraggable(trimRight, false);
+
+// ── Crop Drawing ────────────────────────────────────────────────
+let cropDrag = null;
+cropOverlay.addEventListener('mousedown', e => {
+  const r = cropOverlay.getBoundingClientRect();
+  cropDrag = { sx: e.clientX - r.left, sy: e.clientY - r.top, ow: r.width, oh: r.height };
+});
+document.addEventListener('mousemove', e => {
+  if (!cropDrag) return;
+  const r = cropOverlay.getBoundingClientRect();
+  const cx = e.clientX - r.left, cy = e.clientY - r.top;
+  const x1 = Math.max(0, Math.min(cropDrag.sx, cx));
+  const y1 = Math.max(0, Math.min(cropDrag.sy, cy));
+  const x2 = Math.min(cropDrag.ow, Math.max(cropDrag.sx, cx));
+  const y2 = Math.min(cropDrag.oh, Math.max(cropDrag.sy, cy));
+  cropBox = { x: x1 / cropDrag.ow, y: y1 / cropDrag.oh, w: (x2 - x1) / cropDrag.ow, h: (y2 - y1) / cropDrag.oh };
+  drawCropRect();
+});
+document.addEventListener('mouseup', () => { cropDrag = null; });
+
+function drawCropRect() {
+  if (!cropBox || cropBox.w < 0.01 || cropBox.h < 0.01) return;
+  const r = cropOverlay.getBoundingClientRect();
+  cropRect.style.left   = (cropBox.x * r.width) + 'px';
+  cropRect.style.top    = (cropBox.y * r.height) + 'px';
+  cropRect.style.width  = (cropBox.w * r.width) + 'px';
+  cropRect.style.height = (cropBox.h * r.height) + 'px';
+  cropRect.classList.remove('hidden');
+
+  const pw = Math.round(cropBox.w * videoNatW);
+  const ph = Math.round(cropBox.h * videoNatH);
+  cropDims.textContent = `${pw} × ${ph}`;
+  cropDims.style.left = cropRect.style.left;
+  cropDims.style.top  = (parseFloat(cropRect.style.top) + parseFloat(cropRect.style.height) + 4) + 'px';
+  cropDims.classList.remove('hidden');
+
+  cropEnabled.checked = true;
+  cropInfo.textContent = `Crop: ${pw}×${ph} at (${Math.round(cropBox.x * videoNatW)}, ${Math.round(cropBox.y * videoNatH)})`;
+  cropInfo.classList.remove('hidden');
+}
+
+// ── PROCESSING ────────────────────────────────────────────────
+processBtn.addEventListener('click', async () => {
+  if (!currentFile || !engineReady) return;
+
+  processBtn.disabled = true;
+  processBtn.textContent = '⏳ Processing…';
+  downloadBtn.classList.add('hidden');
+  reuseBtn.classList.add('hidden');
+  statusMsg.classList.add('hidden');
+  progressWrap.classList.remove('hidden');
+  progressFill.style.width = '0%';
+  progressLabel.textContent = 'Reading file…';
+
+  try {
+    const buffer = await new Promise((resolve, reject) => {
+      ioWorker.onmessage = ({ data }) => {
+        if (data.type === 'FILE_READ') resolve(data.buffer);
+        if (data.type === 'ERROR') reject(new Error(data.message));
+      };
+      ioWorker.postMessage({ type: 'READ_FILE', file: currentFile });
+    });
+
+    const ext = currentFile.name.split('.').pop().toLowerCase();
+    const inputName = 'input.' + (ext || 'mp4');
+    await ffmpeg.writeFile(inputName, new Uint8Array(buffer));
+
+    progressLabel.textContent = 'Processing…';
+
+    const hasTrim = trimValues.start > 0.001 || trimValues.end < 0.999;
+    const hasCrop = cropEnabled.checked && cropBox && cropBox.w > 0.01 && cropBox.h > 0.01 && mediaType === 'video';
+
+    let outputName, args;
+
+    if (mediaType === 'video') {
+      outputName = 'output.mp4';
+      const crf = Math.round((parseInt(compSlider.value, 10) / 100) * 51);
+      args = [];
+
+      if (hasTrim) args.push('-ss', fmtTimecode(trimValues.start * duration));
+
+      args.push('-i', inputName);
+
+      if (hasTrim) {
+        const dur = (trimValues.end - trimValues.start) * duration;
+        args.push('-t', fmtTimecode(dur));
+      }
+
+      const filters = [];
+      if (hasCrop) {
+        let cw = Math.round(cropBox.w * videoNatW);
+        let ch = Math.round(cropBox.h * videoNatH);
+        const cx = Math.round(cropBox.x * videoNatW);
+        const cy = Math.round(cropBox.y * videoNatH);
+        cw = cw % 2 === 0 ? cw : cw - 1; 
+        ch = ch % 2 === 0 ? ch : ch - 1;
+        filters.push(`crop=${cw}:${ch}:${cx}:${cy}`);
+      }
+      if (filters.length) args.push('-vf', filters.join(','));
+
+      args.push('-c:v', 'libx264', '-crf', String(crf), '-preset', 'fast');
+
+      if (stripAudio.checked) args.push('-an');
+      else args.push('-c:a', 'aac', '-b:a', '128k');
+
+      args.push(outputName);
+
+    } else {
+      outputName = 'output.mp3';
+      const idx = Math.round((parseInt(compSlider.value, 10) / 100) * (audioBitrates.length - 1));
+      const targetBitrate = audioBitrates[idx] + 'k';
+      args = [];
+      
+      if (hasTrim) args.push('-ss', fmtTimecode(trimValues.start * duration));
+      args.push('-i', inputName);
+      
+      if (hasTrim) {
+        const dur = (trimValues.end - trimValues.start) * duration;
+        args.push('-t', fmtTimecode(dur));
+      }
+      args.push('-b:a', targetBitrate, outputName);
+    }
+
+    console.log('[Crunch] exec:', args.join(' '));
+
+    const ret = await ffmpeg.exec(args);
+    if (ret !== 0) throw new Error(`FFmpeg exited with code ${ret}`);
+
+    const outData = await ffmpeg.readFile(outputName);
+
+    const mimeMap = { 'output.mp4': 'video/mp4', 'output.mp3': 'audio/mpeg' };
+    outputBlob = new Blob([outData.buffer], { type: mimeMap[outputName] || 'application/octet-stream' });
+
+    const ratio = ((1 - outputBlob.size / currentFile.size) * 100).toFixed(1);
+    showStatus(`Done — ${fmtSize(outputBlob.size)} (${ratio > 0 ? ratio + '% smaller' : 'larger than original'})`, 'success');
+    downloadBtn.classList.remove('hidden');
+    reuseBtn.classList.remove('hidden');
+
+    try { await ffmpeg.deleteFile(inputName); } catch (_) {}
+    try { await ffmpeg.deleteFile(outputName); } catch (_) {}
+
+  } catch (err) {
+    console.error('[Crunch] Processing error:', err);
+    showStatus('Error: ' + err.message, 'error');
+  } finally {
+    processBtn.textContent = '⚙ Process';
+    processBtn.disabled = false;
+    progressWrap.classList.add('hidden');
+  }
+});
+
+// ── Download ────────────────────────────────────────────────────
+downloadBtn.addEventListener('click', () => {
+  if (!outputBlob) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(outputBlob);
+  const ext = mediaType === 'video' ? '.mp4' : '.mp3';
+  const base = currentFile.name.replace(/\.[^.]+$/, '');
+  a.download = base + '_crunched' + ext;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// ── Reuse output as input ───────────────────────────────────────
+reuseBtn.addEventListener('click', () => {
+  if (!outputBlob) return;
+  const ext = mediaType === 'video' ? '.mp4' : '.mp3';
+  const base = currentFile.name.replace(/\.[^.]+$/, '');
+  const newFile = new File([outputBlob], base + '_crunched' + ext, { type: outputBlob.type });
+  handleFile(newFile);
+});
+
+</script>
+</body>
+</html>
