@@ -166,6 +166,29 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
         <input type="range" id="compSlider" min="0" max="100" value="50">
         <div id="compExactVal" style="font-family:var(--mono); font-size:.75rem; color:var(--text-dim); text-align:right; margin-top:.35rem;">(CRF: 26)</div>
       </div>
+      
+      <div class="slider-group" id="fpsGroup">
+        <label>Framerate</label>
+        <select id="fpsSelect" style="width:100%; padding:4px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+          <option value="source">Original</option>
+          <option value="60">60 fps</option>
+          <option value="30">30 fps</option>
+          <option value="24">24 fps</option>
+          <option value="18">18 fps</option>
+          <option value="15">15 fps</option>
+          <option value="12">12 fps</option>
+          <option value="8">8 fps</option>
+          <option value="6">6 fps</option>
+          <option value="5">5 fps</option>
+          <option value="4">4 fps</option>
+        </select>
+      </div>
+
+      <div class="check-row" id="compAudioRow">
+        <input type="checkbox" id="compAudioToggle" checked>
+        <label for="compAudioToggle">Compress audio too (Sync with video %)</label>
+      </div>
+
 
       <div class="check-row" id="stripAudioRow">
         <input type="checkbox" id="stripAudio">
@@ -183,6 +206,16 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;heigh
       <div class="trim-times">
         <span id="trimStart">00:00.0</span>
         <span id="trimEnd">00:00.0</span>
+      </div>
+      <div style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+          <h3 style="font-size:0.85rem; font-weight:600;">Timeline Clips</h3>
+          <button id="addClipBtn" class="btn btn-secondary" style="padding:0.3rem 0.6rem; font-size:0.75rem;">+ Add Current Selection</button>
+        </div>
+        <div id="clipList" style="display:flex; flex-direction:column; gap:0.4rem; font-family:var(--mono); font-size:0.75rem; color:var(--text-dim);">
+          <div style="font-family:var(--sans); font-style:italic;">No clips added. Entire file will be processed.</div>
+        </div>
+        <button id="clearClipsBtn" class="hidden" style="margin-top:0.5rem; background:none; border:none; color:var(--red); font-size:0.75rem; cursor:pointer; font-family:var(--sans);">Clear All Clips</button>
       </div>
     </div>
 
@@ -253,6 +286,18 @@ const progressFill  = $('progressFill');
 const progressLabel = $('progressLabel');
 const statusMsg     = $('statusMsg');
 
+const fpsGroup        = $('fpsGroup');
+const fpsSelect       = $('fpsSelect');
+const compAudioRow    = $('compAudioRow');
+const compAudioToggle = $('compAudioToggle');
+
+let sourceAudioBitrate = 128; // Fallback default
+
+const addClipBtn    = $('addClipBtn');
+const clipList      = $('clipList');
+const clearClipsBtn = $('clearClipsBtn');
+
+
 const panels = {
   compress: $('panelCompress'),
   trim:     $('panelTrim'),
@@ -270,6 +315,8 @@ let videoNatW   = 0, videoNatH = 0;
 let outputBlob  = null;
 let engineReady = false;
 
+let editList = []; // Array to hold {start: seconds, end: seconds}
+
 const audioBitrates = [320, 256, 224, 192, 160, 128, 112, 96, 80, 64, 48, 40, 32, 24, 16, 8];
 
 // ── FFmpeg instance (main thread) ───────────────────────────────
@@ -277,6 +324,12 @@ const ffmpeg = new FFmpeg();
 
 ffmpeg.on('log', ({ message }) => {
   console.log('[ffmpeg]', message);
+  // Extract audio bitrate from FFmpeg probe output
+  const match = message.match(/Audio:.* (\d+) kb\/s/);
+  if (match) {
+    sourceAudioBitrate = parseInt(match[1], 10);
+    console.log('[Crunch] Detected Source Audio Bitrate:', sourceAudioBitrate);
+  }
 });
 
 ffmpeg.on('progress', ({ progress }) => {
@@ -311,6 +364,19 @@ async function loadEngine() {
     console.error('[Crunch] Engine load failed:', err);
     showStatus('Engine failed to load: ' + err.message, 'error');
   }
+}
+
+async function fastProbe(file) {
+  try {
+    // Read only the first 2MB to find metadata headers instantly
+    const chunk = file.slice(0, 2 * 1024 * 1024); 
+    const buffer = await chunk.arrayBuffer();
+    await ffmpeg.writeFile('probe.tmp', new Uint8Array(buffer));
+    
+    // Running without an output forces a metadata dump into the log listener
+    await ffmpeg.exec(['-i', 'probe.tmp']); 
+    await ffmpeg.deleteFile('probe.tmp');
+  } catch(e) { console.error("Probe failed", e); }
 }
 
 loadEngine();
@@ -350,6 +416,15 @@ function handleFile(file) {
   statusMsg.classList.add('hidden');
 
   mediaType = file.type.startsWith('audio') ? 'audio' : 'video';
+
+  // Trigger UI changes based on type
+  fpsGroup.classList.toggle('hidden', mediaType === 'audio');
+  compAudioRow.classList.toggle('hidden', mediaType === 'audio');
+  
+  // Fast probe to set sourceAudioBitrate
+  if (engineReady) {
+    fastProbe(file).then(() => updateCompressionUI());
+  }
 
   fileNameEl.textContent = file.name;
   fileMetaEl.textContent = fmtSize(file.size);
@@ -480,6 +555,42 @@ function makeDraggable(handle, isLeft) {
 makeDraggable(trimLeft, true);
 makeDraggable(trimRight, false);
 
+
+// ── Timeline / Clip Logic ───────────────────────────────────────
+function renderClips() {
+  if (editList.length === 0) {
+    clipList.innerHTML = '<div style="font-family:var(--sans); font-style:italic;">No clips added. Entire file will be processed.</div>';
+    clearClipsBtn.classList.add('hidden');
+    return;
+  }
+  
+  clipList.innerHTML = '';
+  editList.forEach((clip, index) => {
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex; justify-content:space-between; background:var(--bg-hover); padding:0.4rem 0.6rem; border-radius:4px;';
+    div.innerHTML = `<span>Clip ${index + 1}: ${fmtTime(clip.start)} → ${fmtTime(clip.end)}</span>`;
+    clipList.appendChild(div);
+  });
+  clearClipsBtn.classList.remove('hidden');
+}
+
+addClipBtn.addEventListener('click', () => {
+  const startSec = trimValues.start * duration;
+  const endSec = trimValues.end * duration;
+  
+  // Prevent adding impossibly small clips
+  if (endSec - startSec < 0.1) return; 
+  
+  editList.push({ start: startSec, end: endSec });
+  renderClips();
+});
+
+clearClipsBtn.addEventListener('click', () => {
+  editList = [];
+  renderClips();
+});
+
+
 // ── Crop Drawing ────────────────────────────────────────────────
 let cropDrag = null;
 cropOverlay.addEventListener('mousedown', e => {
@@ -558,14 +669,25 @@ processBtn.addEventListener('click', async () => {
       const crf = Math.round((parseInt(compSlider.value, 10) / 100) * 51);
       args = [];
 
-      if (hasTrim) args.push('-ss', fmtTimecode(trimValues.start * duration));
-
-      args.push('-i', inputName);
-
-      if (hasTrim) {
-        const dur = (trimValues.end - trimValues.start) * duration;
-        args.push('-t', fmtTimecode(dur));
+      // --- EDIT 4: TIMELINE CONCAT LOGIC (VIDEO) ---
+      if (editList.length > 0) {
+        let txt = "";
+        editList.forEach(clip => {
+          txt += `file '${inputName}'\n`;
+          txt += `inpoint ${clip.start.toFixed(3)}\n`;
+          txt += `outpoint ${clip.end.toFixed(3)}\n`;
+        });
+        await ffmpeg.writeFile('list.txt', txt);
+        args.push('-f', 'concat', '-safe', '0', '-i', 'list.txt');
+      } else {
+        if (hasTrim) args.push('-ss', fmtTimecode(trimValues.start * duration));
+        args.push('-i', inputName);
+        if (hasTrim) {
+          const dur = (trimValues.end - trimValues.start) * duration;
+          args.push('-t', fmtTimecode(dur));
+        }
       }
+      // ---------------------------------------------
 
       const filters = [];
       if (hasCrop) {
@@ -581,10 +703,26 @@ processBtn.addEventListener('click', async () => {
 
       args.push('-c:v', 'libx264', '-crf', String(crf), '-preset', 'fast');
 
-      if (stripAudio.checked) args.push('-an');
-      else args.push('-c:a', 'aac', '-b:a', '128k');
+      // 1. FPS Configuration
+      if (fpsSelect.value !== 'source') {
+        args.push('-r', fpsSelect.value);
+      }
 
-      args.push(outputName);
+      // 2. Audio Sync Configuration
+      if (stripAudio.checked) {
+        args.push('-an');
+      } else if (compAudioToggle.checked) {
+        // Calculate proportional bitrate and snap to nearest standard value
+        const pct = parseInt(compSlider.value, 10) / 100;
+        const target = sourceAudioBitrate * pct;
+        const nearest = audioBitrates.reduce((a, b) => Math.abs(b - target) < Math.abs(a - target) ? b : a);
+        args.push('-c:a', 'aac', '-b:a', nearest + 'k');
+      } else {
+        args.push('-c:a', 'copy'); // Keep original audio untouched
+      }
+      
+      // Multithreading to speed up WASM
+      args.push('-threads', '4', outputName);
 
     } else {
       outputName = 'output.mp3';
@@ -592,13 +730,26 @@ processBtn.addEventListener('click', async () => {
       const targetBitrate = audioBitrates[idx] + 'k';
       args = [];
       
-      if (hasTrim) args.push('-ss', fmtTimecode(trimValues.start * duration));
-      args.push('-i', inputName);
-      
-      if (hasTrim) {
-        const dur = (trimValues.end - trimValues.start) * duration;
-        args.push('-t', fmtTimecode(dur));
+      // --- TIMELINE CONCAT LOGIC (AUDIO) ---
+      if (editList.length > 0) {
+        let txt = "";
+        editList.forEach(clip => {
+          txt += `file '${inputName}'\n`;
+          txt += `inpoint ${clip.start.toFixed(3)}\n`;
+          txt += `outpoint ${clip.end.toFixed(3)}\n`;
+        });
+        await ffmpeg.writeFile('list.txt', txt);
+        args.push('-f', 'concat', '-safe', '0', '-i', 'list.txt');
+      } else {
+        if (hasTrim) args.push('-ss', fmtTimecode(trimValues.start * duration));
+        args.push('-i', inputName);
+        if (hasTrim) {
+          const dur = (trimValues.end - trimValues.start) * duration;
+          args.push('-t', fmtTimecode(dur));
+        }
       }
+      // ---------------------------------------------
+
       args.push('-b:a', targetBitrate, outputName);
     }
 
@@ -619,6 +770,8 @@ processBtn.addEventListener('click', async () => {
 
     try { await ffmpeg.deleteFile(inputName); } catch (_) {}
     try { await ffmpeg.deleteFile(outputName); } catch (_) {}
+    // Clean up the timeline text file if it was used
+    try { await ffmpeg.deleteFile('list.txt'); } catch (_) {}
 
   } catch (err) {
     console.error('[Crunch] Processing error:', err);
