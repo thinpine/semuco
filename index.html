@@ -487,6 +487,24 @@ removeBtn.addEventListener('click', () => {
   videoEl.src = '';
   audioEl.src = '';
   fileInput.value = '';
+
+  // 1. Reset Timeline Clips
+  editList = [];
+  if (typeof renderClips === 'function') renderClips();
+  
+  // 2. Reset Crop State
+  cropBox = null;
+  cropEnabled.checked = false;
+  cropRect.classList.add('hidden');
+  cropDims.classList.add('hidden');
+  cropInfo.classList.add('hidden');
+  
+  // 3. Reset Sliders & Toggles
+  compSlider.value = 50;
+  updateCompressionUI();
+  fpsSelect.value = 'source';
+  compAudioToggle.checked = true;
+  stripAudio.checked = false;
 });
 
 // ── Mode Toggle ─────────────────────────────────────────────────
@@ -593,30 +611,89 @@ clearClipsBtn.addEventListener('click', () => {
 
 // ── Crop Drawing ────────────────────────────────────────────────
 let cropDrag = null;
+
+// Helper: Calculate the true dimensions of the video, ignoring CSS black bars
+function getVideoRenderedRect() {
+  const rect = videoEl.getBoundingClientRect();
+  const viewRatio = rect.width / rect.height;
+  const videoRatio = videoNatW / videoNatH;
+  
+  let actualW, actualH;
+  if (viewRatio > videoRatio) {
+    // Taller than wide (Vertical video w/ side bars)
+    actualH = rect.height;
+    actualW = actualH * videoRatio;
+  } else {
+    // Wider than tall (Horizontal video w/ top bars)
+    actualW = rect.width;
+    actualH = actualW / videoRatio;
+  }
+  
+  const xOffset = (rect.width - actualW) / 2;
+  const yOffset = (rect.height - actualH) / 2;
+  
+  return {
+    left: rect.left + xOffset,
+    top: rect.top + yOffset,
+    width: actualW,
+    height: actualH
+  };
+}
+
 cropOverlay.addEventListener('mousedown', e => {
-  const r = cropOverlay.getBoundingClientRect();
-  cropDrag = { sx: e.clientX - r.left, sy: e.clientY - r.top, ow: r.width, oh: r.height };
+  const vRect = getVideoRenderedRect();
+  // Map mouse coordinates to the true video rect
+  let cx = e.clientX - vRect.left;
+  let cy = e.clientY - vRect.top;
+  
+  // Clamp start point so you can't click on the black bars
+  cx = Math.max(0, Math.min(cx, vRect.width));
+  cy = Math.max(0, Math.min(cy, vRect.height));
+  
+  cropDrag = { sx: cx, sy: cy, vRect: vRect };
 });
+
 document.addEventListener('mousemove', e => {
   if (!cropDrag) return;
-  const r = cropOverlay.getBoundingClientRect();
-  const cx = e.clientX - r.left, cy = e.clientY - r.top;
-  const x1 = Math.max(0, Math.min(cropDrag.sx, cx));
-  const y1 = Math.max(0, Math.min(cropDrag.sy, cy));
-  const x2 = Math.min(cropDrag.ow, Math.max(cropDrag.sx, cx));
-  const y2 = Math.min(cropDrag.oh, Math.max(cropDrag.sy, cy));
-  cropBox = { x: x1 / cropDrag.ow, y: y1 / cropDrag.oh, w: (x2 - x1) / cropDrag.ow, h: (y2 - y1) / cropDrag.oh };
+  const vRect = cropDrag.vRect;
+  let cx = e.clientX - vRect.left;
+  let cy = e.clientY - vRect.top;
+  
+  // Clamp drag point to true video bounds
+  cx = Math.max(0, Math.min(cx, vRect.width));
+  cy = Math.max(0, Math.min(cy, vRect.height));
+  
+  const x1 = Math.min(cropDrag.sx, cx);
+  const y1 = Math.min(cropDrag.sy, cy);
+  const x2 = Math.max(cropDrag.sx, cx);
+  const y2 = Math.max(cropDrag.sy, cy);
+  
+  // Store percentages purely relative to the video footage
+  cropBox = { 
+    x: x1 / vRect.width, 
+    y: y1 / vRect.height, 
+    w: (x2 - x1) / vRect.width, 
+    h: (y2 - y1) / vRect.height 
+  };
   drawCropRect();
 });
+
 document.addEventListener('mouseup', () => { cropDrag = null; });
 
 function drawCropRect() {
   if (!cropBox || cropBox.w < 0.01 || cropBox.h < 0.01) return;
-  const r = cropOverlay.getBoundingClientRect();
-  cropRect.style.left   = (cropBox.x * r.width) + 'px';
-  cropRect.style.top    = (cropBox.y * r.height) + 'px';
-  cropRect.style.width  = (cropBox.w * r.width) + 'px';
-  cropRect.style.height = (cropBox.h * r.height) + 'px';
+  
+  const vRect = getVideoRenderedRect();
+  const oRect = cropOverlay.getBoundingClientRect();
+  
+  // Apply visual offset so the visual box overlays correctly
+  const offsetX = vRect.left - oRect.left;
+  const offsetY = vRect.top - oRect.top;
+
+  cropRect.style.left   = (offsetX + cropBox.x * vRect.width) + 'px';
+  cropRect.style.top    = (offsetY + cropBox.y * vRect.height) + 'px';
+  cropRect.style.width  = (cropBox.w * vRect.width) + 'px';
+  cropRect.style.height = (cropBox.h * vRect.height) + 'px';
   cropRect.classList.remove('hidden');
 
   const pw = Math.round(cropBox.w * videoNatW);
