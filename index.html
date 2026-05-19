@@ -3,125 +3,280 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Crunch — Media Compressor & Editor</title>
+<title>semuco - Media Compressor & Editor</title>
 
 <script src="coi-serviceworker.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
-:root {
-  --bg:#0c0c0e; --bg-card:#151518; --bg-hover:#1e1e23;
-  --border:#2a2a30; --border-hi:#3d3d45;
-  --text:#e4e4e8; --text-dim:#8a8a96;
-  --accent:#c8ff32; --accent-dim:#9abf26;
-  --red:#ff4f5e; --orange:#ffa64d;
-  --sans:'DM Sans',sans-serif; --mono:'JetBrains Mono',monospace;
-  --radius:10px; --radius-lg:16px;
+/* 1. Base Aero Theme (Default) */
+:root, [data-theme="aero"] {
+  --bg: #d9eaf7;
+  --bg-card: #ffffff;
+  --bg-hover: #eef6fc;
+  --border: #aebfd0;
+  --border-hi: #7ea0c2;
+  --text: #2a3b4c;
+  --text-dim: #5c748c;
+  --accent: #3ea0eb;
+  --accent-dim: #237cbd;
+  --red: #d9534f;
+  --orange: #f0ad4e;
+  
+  --sans: 'Trebuchet MS', 'Lucida Grande', Tahoma, sans-serif;
+  --mono: 'Courier New', Courier, monospace;
+  --radius: 6px;
+  --radius-lg: 8px;
+
+  /* Glossy Gradients & FX */
+  --grad-body: radial-gradient(circle at 50% 0%, #ffffff 0%, var(--bg) 100%);
+  --grad-primary: linear-gradient(135deg, #a4d3f5 0%, #3ea0eb 50%, #237cbd 51%, #155a8a 100%);
+  --grad-primary-hover: linear-gradient(to bottom, #7ec0ee 0%, #3ea0eb 50%, #237cbd 51%, #155a8a 100%);
+  --grad-primary-active: linear-gradient(to bottom, #155a8a 0%, #237cbd 50%, #3ea0eb 51%, #7ec0ee 100%);
+  --grad-secondary: linear-gradient(to bottom, #fdfdfd 0%, #e0e0e0 50%, #d0d0d0 51%, #b0b0b0 100%);
+  --grad-secondary-active: linear-gradient(to bottom, #b0b0b0 0%, #d0d0d0 50%, #e0e0e0 51%, #fdfdfd 100%);
+  --grad-card-head: linear-gradient(to bottom, #fdfdfd, #f0f0f0);
+  --grad-progress: linear-gradient(to bottom, #8fcf3c 0%, #6ab023 50%, #528c1a 51%, #407012 100%);
+  --preview-bg: linear-gradient(to bottom, #111, #333);
+  
+  --border-primary: #155a8a;
+  --shadow-light: inset 0 1px 0 rgba(255,255,255,0.6);
+  --shadow-dark: 0 2px 4px rgba(0,0,0,0.2);
+  --text-shadow-light: 0 1px 0 rgba(255,255,255,0.8);
+  --dropzone-bg: rgba(255,255,255,0.6);
 }
 
-html{font-size:15px}
-body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+/* 2. Eco Theme (Frutiger Eco) */
+[data-theme="eco"] {
+  --bg: #eaf7d9;
+  --bg-card: #ffffff;
+  --bg-hover: #f4faeb;
+  --border: #b8d0ae;
+  --border-hi: #93b585;
+  --text: #314c2a;
+  --text-dim: #678c5c;
+  --accent: #8fcf3c;
+  --accent-dim: #72a62e;
+  
+  --grad-body: radial-gradient(circle at 50% 0%, #ffffff 0%, var(--bg) 100%);
+  --grad-primary: linear-gradient(135deg, #d2f5a4 0%, #8fcf3c 50%, #72a62e 51%, #426318 100%);
+  --grad-primary-hover: linear-gradient(to bottom, #b2ee66 0%, #8fcf3c 50%, #72a62e 51%, #426318 100%);
+  --grad-primary-active: linear-gradient(to bottom, #426318 0%, #72a62e 50%, #8fcf3c 51%, #b2ee66 100%);
+  --grad-secondary: linear-gradient(to bottom, #ffffff 0%, #eef5e6 50%, #dbe8ce 51%, #c2d6af 100%);
+  --grad-secondary-active: linear-gradient(to bottom, #c2d6af 0%, #dbe8ce 50%, #eef5e6 51%, #ffffff 100%);
+  --grad-card-head: linear-gradient(to bottom, #ffffff, #eef5e6);
+  --grad-progress: linear-gradient(to bottom, #60bfe6 0%, #2b9dd0 50%, #1c7ba6 51%, #105270 100%);
+  --preview-bg: linear-gradient(to bottom, #1a2416, #2d3b25);
+  
+  --border-primary: #426318;
+  --dropzone-bg: rgba(255,255,255,0.8);
+}
+
+/* 3. Ego Theme (Dark Metallic) */
+[data-theme="ego"] {
+  --bg: #1c1e23;
+  --bg-card: #282c34;
+  --bg-hover: #323741;
+  --border: #111316;
+  --border-hi: #4b5263;
+  --text: #e0e4eb;
+  --text-dim: #8b96ab;
+  --accent: #5ca8e6;
+  --accent-dim: #3a7ec9;
+  
+  --grad-body: radial-gradient(circle at 50% 0%, #323741 0%, var(--bg) 100%);
+  --grad-primary: linear-gradient(135deg, #4f5b66 0%, #343d46 50%, #252b33 51%, #111316 100%);
+  --grad-primary-hover: linear-gradient(to bottom, #657380 0%, #3f4954 50%, #2f3640 51%, #111316 100%);
+  --grad-primary-active: linear-gradient(to bottom, #111316 0%, #2f3640 50%, #3f4954 51%, #657380 100%);
+  --grad-secondary: linear-gradient(to bottom, #3f4954 0%, #343d46 50%, #252b33 51%, #181c21 100%);
+  --grad-secondary-active: linear-gradient(to bottom, #181c21 0%, #252b33 50%, #343d46 51%, #3f4954 100%);
+  --grad-card-head: linear-gradient(to bottom, #323741, #282c34);
+  --grad-progress: linear-gradient(to bottom, #94c4f2 0%, #5ca8e6 50%, #3a7ec9 51%, #1f4a7a 100%);
+  --preview-bg: linear-gradient(to bottom, #0a0b0d, #14171c);
+  
+  --border-primary: #0a0b0d;
+  --shadow-light: inset 0 1px 0 rgba(255,255,255,0.15);
+  --shadow-dark: 0 4px 8px rgba(0,0,0,0.5);
+  --text-shadow-light: 0 1px 0 rgba(0,0,0,0.6); /* Inverse for dark mode */
+  --dropzone-bg: rgba(40, 44, 52, 0.4);
+}
+
+/* Core Document Styles */
+html{font-size:14px}
+body {
+  font-family: var(--sans);
+  background: var(--grad-body);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: auto;
+}
 
 /* Layout */
 .app{max-width:920px;margin:0 auto;padding:2rem 1.25rem 4rem}
-header{display:flex;align-items:center;gap:.75rem;margin-bottom:2.5rem}
-header .logo{width:38px;height:38px;background:var(--accent);border-radius:8px;display:grid;place-items:center;font-family:var(--mono);font-weight:700;font-size:1.15rem;color:var(--bg);flex-shrink:0}
-header h1{font-size:1.6rem;font-weight:700;letter-spacing:-0.03em}
+header{display:flex;align-items:center;gap:.75rem;margin-bottom:2.5rem; text-shadow: var(--text-shadow-light);}
+
+.theme-select {
+  margin-left: .5rem;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: var(--grad-secondary);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+  border: 1px solid var(--border-hi);
+  box-shadow: var(--shadow-light), var(--shadow-dark);
+  text-shadow: var(--text-shadow-light);
+}
+
+header .logo {
+  width:42px;height:42px;
+  background: var(--grad-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  display:grid;place-items:center;
+  font-family:var(--sans);font-weight:700;font-size:1.3rem;color:#fff;
+  flex-shrink:0;
+  box-shadow: var(--shadow-light), var(--shadow-dark);
+  text-shadow: 0 -1px 0 rgba(0,0,0,0.3);
+}
+header h1{font-size:1.8rem;font-weight:700;letter-spacing:-0.02em; color: var(--text);}
 header p{color:var(--text-dim);font-size:.85rem;margin-left:auto;text-align:right}
 
 /* Drop Zone */
-.dropzone{border:2px dashed var(--border);border-radius:var(--radius-lg);padding:3.5rem 2rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative}
-.dropzone:hover,.dropzone.dragover{border-color:var(--accent);background:rgba(200,255,50,.03)}
-.dropzone .icon{font-size:2.5rem;margin-bottom:.75rem}
-.dropzone .primary{font-size:1.05rem;font-weight:500}
-.dropzone .secondary{color:var(--text-dim);font-size:.82rem;margin-top:.35rem}
+.dropzone{
+  background: var(--dropzone-bg);
+  border:2px dashed var(--border-hi);
+  border-radius:var(--radius-lg);
+  padding:3.5rem 2rem;text-align:center;cursor:pointer;
+  transition:border-color .2s,background .2s;
+  box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
+}
+.dropzone:hover,.dropzone.dragover{border-color:var(--accent);background:var(--bg-hover);}
+.dropzone .icon{font-size:3rem;margin-bottom:.75rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));}
+.dropzone .primary{font-size:1.1rem;font-weight:700; color:var(--text);}
+.dropzone .secondary{color:var(--text-dim);font-size:.85rem;margin-top:.4rem}
 .dropzone input{display:none}
 
 /* Card */
-.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.5rem;margin-bottom:1rem;animation:fadeIn .35s ease}
-.card h2{font-size:.95rem;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
-.card h2 .badge{font-family:var(--mono);font-size:.65rem;background:var(--bg-hover);border:1px solid var(--border);border-radius:4px;padding:.15rem .45rem;color:var(--text-dim);font-weight:400}
+.card{
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:1.5rem;margin-bottom:1rem;
+  box-shadow: var(--shadow-dark), var(--shadow-light);
+  animation:fadeIn .35s ease;
+}
+.card h2{font-size:1.05rem;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem; color:var(--text);}
+.card h2 .badge{font-family:var(--sans);font-size:.7rem;background:var(--grad-card-head);border:1px solid var(--border);border-radius:4px;padding:.15rem .45rem;color:var(--text-dim);font-weight:700; box-shadow: var(--shadow-light);}
 
 /* File Info */
-.file-info{display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;background:var(--bg-hover);border-radius:var(--radius);margin-bottom:1rem;flex-wrap:wrap}
-.file-info .name{font-family:var(--mono);font-size:.82rem;font-weight:600;word-break:break-all}
-.file-info .meta{color:var(--text-dim);font-size:.78rem;font-family:var(--mono)}
-.file-info .remove-btn{margin-left:auto;background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:6px;padding:.3rem .65rem;cursor:pointer;font-size:.75rem;transition:all .15s}
-.file-info .remove-btn:hover{border-color:var(--red);color:var(--red)}
+.file-info{display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;background:var(--grad-card-head);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:1rem;flex-wrap:wrap; box-shadow: var(--shadow-light);}
+.file-info .name{font-family:var(--mono);font-size:.85rem;font-weight:700;word-break:break-all;}
+.file-info .meta{color:var(--text-dim);font-size:.8rem;}
+.file-info .remove-btn{margin-left:auto;background:var(--grad-secondary);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:.3rem .65rem;cursor:pointer;font-size:.75rem; font-weight:700; box-shadow: var(--shadow-light), 0 1px 2px rgba(0,0,0,0.1); text-shadow: var(--text-shadow-light);}
+.file-info .remove-btn:hover{border-color:var(--red);color:var(--red);}
 
 /* Preview */
-.preview-wrap{position:relative;width:100%;border-radius:var(--radius);overflow:hidden;background:#000;margin-bottom:1rem}
+.preview-wrap{position:relative;width:100%;border-radius:var(--radius);overflow:hidden;background:var(--preview-bg);margin-bottom:1rem; border: 1px solid var(--border-primary); box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);}
 .preview-wrap video,.preview-wrap audio{width:100%;display:block;max-height:420px;object-fit:contain}
 
 /* Crop */
 .crop-container{position:relative;display:inline-block;width:100%}
 .crop-overlay{position:absolute;top:0;left:0;right:0;bottom:0;cursor:crosshair;z-index:5}
-.crop-rect{position:absolute;border:2px solid var(--accent);box-shadow:0 0 0 9999px rgba(0,0,0,.55);z-index:6;pointer-events:none}
-.crop-dims{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.7);color:var(--accent);font-family:var(--mono);font-size:.7rem;padding:2px 6px;border-radius:4px;z-index:7}
+.crop-rect{position:absolute;border:2px dashed #fff;outline: 1px solid #000; box-shadow:0 0 0 9999px rgba(0,0,0,.4);z-index:6;pointer-events:none}
+.crop-dims{position:absolute;bottom:6px;right:6px;background:linear-gradient(to bottom, rgba(255,255,255,0.9), rgba(220,220,220,0.9));color:#000;font-family:var(--mono);font-size:.7rem;font-weight:bold;padding:2px 6px;border:1px solid #999;border-radius:3px;z-index:7; box-shadow: 0 1px 3px rgba(0,0,0,0.3);}
 
 /* Sliders */
 .slider-group{margin-bottom:1rem}
-.slider-group label{display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:.35rem}
-.slider-group label span{color:var(--text-dim);font-family:var(--mono)}
-input[type=range]{-webkit-appearance:none;width:100%;height:6px;background:var(--border);border-radius:3px;outline:none}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;background:var(--accent);border-radius:50%;cursor:grab;border:2px solid var(--bg);box-shadow:0 0 6px rgba(200,255,50,.3)}
+.slider-group label{display:flex;justify-content:space-between;font-size:.85rem;font-weight:700;margin-bottom:.4rem}
+.slider-group label span{color:var(--text-dim);font-weight:normal;}
+input[type=range]{-webkit-appearance:none;width:100%;height:8px;background:inset 0 1px 3px rgba(0,0,0,0.2);background-color: var(--border);border:1px solid var(--border-hi);border-radius:4px;outline:none; box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;background:var(--grad-secondary);border-radius:50%;cursor:pointer;border:1px solid var(--border-hi);box-shadow: var(--shadow-light), 0 1px 3px rgba(0,0,0,0.3);}
 
 /* Trim */
-.trim-bar{position:relative;height:40px;background:var(--bg-hover);border-radius:var(--radius);margin-bottom:.5rem;overflow:hidden}
-.trim-bar .fill{position:absolute;top:0;bottom:0;background:rgba(200,255,50,.12);border-left:3px solid var(--accent);border-right:3px solid var(--accent);pointer-events:none}
-.trim-bar .handle{position:absolute;top:0;bottom:0;width:14px;background:var(--accent);cursor:ew-resize;z-index:3;border-radius:3px;display:grid;place-items:center}
-.trim-bar .handle::after{content:'‖';font-size:.6rem;color:var(--bg);font-weight:700}
+.trim-bar{position:relative;height:36px;background-color: var(--border);border:1px solid var(--border-hi);border-radius:var(--radius);margin-bottom:.5rem;overflow:hidden; box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);}
+.trim-bar .fill{position:absolute;top:0;bottom:0;background:var(--accent);opacity:0.2;border-left:1px solid var(--accent-dim);border-right:1px solid var(--accent-dim);pointer-events:none}
+.trim-bar .handle{position:absolute;top:0;bottom:0;width:12px;background:var(--grad-secondary);border:1px solid var(--border-hi);cursor:ew-resize;z-index:3;border-radius:3px;display:grid;place-items:center; box-shadow: var(--shadow-light), 0 1px 2px rgba(0,0,0,0.3);}
+.trim-bar .handle::after{content:'‖';font-size:.5rem;color:var(--text-dim);font-weight:700}
 .trim-bar .handle.left{left:0}
 .trim-bar .handle.right{right:0}
-.trim-times{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.75rem;color:var(--text-dim);margin-bottom:1rem}
+.trim-times{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.75rem;color:var(--text-dim);margin-bottom:1rem;font-weight:bold;}
 
 /* Buttons */
-.btn{display:inline-flex;align-items:center;gap:.45rem;font-family:var(--sans);font-size:.88rem;font-weight:600;border:none;border-radius:var(--radius);padding:.7rem 1.5rem;cursor:pointer;transition:all .15s}
-.btn-primary{background:var(--accent);color:var(--bg)}
-.btn-primary:hover{background:var(--accent-dim)}
-.btn-primary:disabled{opacity:.4;cursor:not-allowed}
-.btn-secondary{background:var(--bg-hover);color:var(--text);border:1px solid var(--border)}
-.btn-secondary:hover{border-color:var(--border-hi);background:var(--border)}
+.btn{display:inline-flex;align-items:center;gap:.45rem;font-family:var(--sans);font-size:.9rem;font-weight:700;border-radius:var(--radius);padding:.6rem 1.5rem;cursor:pointer;}
+.btn-primary{
+  background: var(--grad-primary-hover);
+  color: #fff;
+  border: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-light), var(--shadow-dark);
+  text-shadow: 0 -1px 0 rgba(0,0,0,0.4);
+}
+.btn-primary:active{background: var(--grad-primary-active); box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;filter:grayscale(100%);}
+
+.btn-secondary{
+  background: var(--grad-secondary);
+  color: var(--text);
+  border: 1px solid var(--border-hi);
+  box-shadow: var(--shadow-light), var(--shadow-dark);
+  text-shadow: var(--text-shadow-light);
+}
+.btn-secondary:active{background: var(--grad-secondary-active); box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);}
 .actions{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
 
 /* Progress */
-.progress-wrap{margin-top:1rem}
-.progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden}
-.progress-bar .fill{height:100%;background:var(--accent);width:0%;transition:width .2s;border-radius:4px}
-.progress-label{font-family:var(--mono);font-size:.75rem;color:var(--text-dim);margin-top:.3rem}
+.progress-wrap{margin-top:1rem;background:var(--grad-card-head);border:1px solid var(--border);padding:1rem;border-radius:var(--radius);box-shadow: var(--shadow-light), 0 2px 4px rgba(0,0,0,0.05);}
+.progress-bar{height:16px;background:var(--border);border:1px solid var(--border-hi);border-radius:8px;overflow:hidden;box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);}
+.progress-bar .fill{height:100%;background:var(--grad-progress);width:0%; border-right: 1px solid var(--border-primary); box-shadow: var(--shadow-light);}
+.progress-label{font-family:var(--sans);font-size:.8rem;font-weight:700;color:var(--text);margin-top:.4rem;text-align:center;}
 
 /* Status */
-.status{padding:.65rem 1rem;border-radius:var(--radius);font-size:.82rem;margin-top:.75rem}
-.status.success{background:rgba(200,255,50,.08);color:var(--accent);border:1px solid rgba(200,255,50,.2)}
-.status.error{background:rgba(255,79,94,.08);color:var(--red);border:1px solid rgba(255,79,94,.2)}
-.status.info{background:rgba(255,166,77,.06);color:var(--orange);border:1px solid rgba(255,166,77,.15)}
+.status{padding:.65rem 1rem;border-radius:var(--radius);font-size:.85rem;font-weight:700;margin-top:.75rem;box-shadow: var(--shadow-light), 0 1px 2px rgba(0,0,0,0.1);}
+.status.success{background:linear-gradient(to bottom, #eaf6dc, #d1eab3);color:#3f6b15;border:1px solid #a6c986;}
+.status.error{background:linear-gradient(to bottom, #fcdada, #f5baba);color:#a12626;border:1px solid #d99191;}
+.status.info{background:linear-gradient(to bottom, #fdf5e6, #fae3be);color:#b36b00;border:1px solid #dcb47d;}
 
 /* Toggle / Check */
 .toggle-row{display:flex;gap:.5rem;margin-bottom:1rem}
-.toggle-row button{flex:1;padding:.55rem;font-family:var(--sans);font-size:.82rem;font-weight:500;background:var(--bg-hover);color:var(--text-dim);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all .15s}
-.toggle-row button.active{background:rgba(200,255,50,.08);color:var(--accent);border-color:var(--accent)}
-.check-row{display:flex;align-items:center;gap:.5rem;font-size:.82rem;margin-bottom:.75rem}
-.check-row input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
+.toggle-row button{flex:1;padding:.55rem;font-family:var(--sans);font-size:.85rem;font-weight:700;background:var(--grad-secondary);color:var(--text-dim);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer; box-shadow: var(--shadow-light), 0 1px 2px rgba(0,0,0,0.05); text-shadow: var(--text-shadow-light);}
+.toggle-row button.active{
+  background: var(--bg-hover);
+  color: var(--accent);
+  border-color: var(--border-primary);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.15), var(--shadow-light);
+}
+.check-row{display:flex;align-items:center;gap:.5rem;font-size:.85rem;font-weight:700;margin-bottom:.75rem}
+.check-row input[type=checkbox]{width:14px;height:14px; margin-top:2px;}
+select { box-shadow: inset 0 1px 2px rgba(0,0,0,0.1); border: 1px solid var(--border-hi); font-family: var(--sans); background: var(--bg-card); color: var(--text); }
 
 .hidden{display:none !important}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-@media(max-width:600px){.app{padding:1.25rem .75rem 3rem}header h1{font-size:1.25rem}header p{display:none}.dropzone{padding:2.5rem 1rem}}
+@media(max-width:600px){.app{padding:1.25rem .75rem 3rem}header h1{font-size:1.4rem}header p{display:none}.dropzone{padding:2.5rem 1rem}}
 </style>
 </head>
 <body>
 <div class="app">
 
   <header>
-    <div class="logo">C</div>
-    <h1>Crunch</h1>
-    <p>Client-side media compressor &amp; editor — nothing leaves your device.</p>
+    <div class="logo">smc</div>
+    <h1>semuco</h1>
+    
+    <select id="themeSelect" class="theme-select">
+      <option value="aero">💧 Aero Theme</option>
+      <option value="eco">🍃 Eco Theme</option>
+      <option value="ego">🌑 Ego (Dark)</option>
+    </select>
+    
+    <p>Client-side media compressor &amp; editor. Nothing leaves your device.</p>
   </header>
 
   <div class="dropzone" id="dropzone">
@@ -328,7 +483,7 @@ ffmpeg.on('log', ({ message }) => {
   const match = message.match(/Audio:.* (\d+) kb\/s/);
   if (match) {
     sourceAudioBitrate = parseInt(match[1], 10);
-    console.log('[Crunch] Detected Source Audio Bitrate:', sourceAudioBitrate);
+    console.log('[semuco] Detected Source Audio Bitrate:', sourceAudioBitrate);
   }
 });
 
@@ -359,9 +514,9 @@ async function loadEngine() {
     processBtn.textContent = '⚙ Process';
     if (currentFile) processBtn.disabled = false;
     showStatus('Engine ready.', 'info');
-    console.log('[Crunch] FFmpeg engine loaded');
+    console.log('[semuco] FFmpeg engine loaded');
   } catch (err) {
-    console.error('[Crunch] Engine load failed:', err);
+    console.error('[semuco] Engine load failed:', err);
     showStatus('Engine failed to load: ' + err.message, 'error');
   }
 }
@@ -746,27 +901,8 @@ processBtn.addEventListener('click', async () => {
       const crf = Math.round((parseInt(compSlider.value, 10) / 100) * 51);
       args = [];
 
-      // --- EDIT 4: TIMELINE CONCAT LOGIC (VIDEO) ---
-      if (editList.length > 0) {
-        let txt = "";
-        editList.forEach(clip => {
-          txt += `file '${inputName}'\n`;
-          txt += `inpoint ${clip.start.toFixed(3)}\n`;
-          txt += `outpoint ${clip.end.toFixed(3)}\n`;
-        });
-        await ffmpeg.writeFile('list.txt', txt);
-        args.push('-f', 'concat', '-safe', '0', '-i', 'list.txt');
-      } else {
-        if (hasTrim) args.push('-ss', fmtTimecode(trimValues.start * duration));
-        args.push('-i', inputName);
-        if (hasTrim) {
-          const dur = (trimValues.end - trimValues.start) * duration;
-          args.push('-t', fmtTimecode(dur));
-        }
-      }
-      // ---------------------------------------------
-
-      const filters = [];
+      // Pre-calculate crop string if needed
+      let cropStr = "";
       if (hasCrop) {
         let cw = Math.round(cropBox.w * videoNatW);
         let ch = Math.round(cropBox.h * videoNatH);
@@ -774,9 +910,50 @@ processBtn.addEventListener('click', async () => {
         const cy = Math.round(cropBox.y * videoNatH);
         cw = cw % 2 === 0 ? cw : cw - 1; 
         ch = ch % 2 === 0 ? ch : ch - 1;
-        filters.push(`crop=${cw}:${ch}:${cx}:${cy}`);
+        cropStr = `crop=${cw}:${ch}:${cx}:${cy}`;
       }
-      if (filters.length) args.push('-vf', filters.join(','));
+
+      // --- ADVANCED FILTERGRAPH CONCAT (PERFECT SYNC) ---
+      if (editList.length > 0) {
+        args.push('-i', inputName); // Input goes first for complex filters
+        
+        let fg = "";
+        let concatStr = "";
+        const hasA = !stripAudio.checked;
+
+        editList.forEach((clip, i) => {
+          // Slice video and reset timestamps
+          fg += `[0:v]trim=start=${clip.start.toFixed(3)}:end=${clip.end.toFixed(3)},setpts=PTS-STARTPTS[v${i}];`;
+          // Slice audio and reset timestamps
+          if (hasA) {
+            fg += `[0:a]atrim=start=${clip.start.toFixed(3)}:end=${clip.end.toFixed(3)},asetpts=PTS-STARTPTS[a${i}];`;
+          }
+          // Build concat map
+          concatStr += `[v${i}]`;
+          if (hasA) concatStr += `[a${i}]`;
+        });
+
+        // Concat all streams
+        fg += `${concatStr}concat=n=${editList.length}:v=1:a=${hasA ? 1 : 0}[outv]${hasA ? '[outa]' : ''}`;
+
+        // Append crop to the end of the concat chain if needed
+        if (hasCrop) fg += `;[outv]${cropStr}[finalv]`;
+
+        args.push('-filter_complex', fg);
+        args.push('-map', hasCrop ? '[finalv]' : '[outv]');
+        if (hasA) args.push('-map', '[outa]');
+
+      } else {
+        // --- STANDARD SINGLE TRIM (FAST SEEKING) ---
+        if (hasTrim) args.push('-ss', fmtTimecode(trimValues.start * duration));
+        args.push('-i', inputName);
+        if (hasTrim) {
+          const dur = (trimValues.end - trimValues.start) * duration;
+          args.push('-t', fmtTimecode(dur));
+        }
+        if (hasCrop) args.push('-vf', cropStr);
+      }
+      // ---------------------------------------------------------
 
       args.push('-c:v', 'libx264', '-crf', String(crf), '-preset', 'fast');
 
@@ -789,34 +966,35 @@ processBtn.addEventListener('click', async () => {
       if (stripAudio.checked) {
         args.push('-an');
       } else if (compAudioToggle.checked) {
-        // Calculate proportional bitrate and snap to nearest standard value
         const pct = parseInt(compSlider.value, 10) / 100;
         const target = sourceAudioBitrate * pct;
         const nearest = audioBitrates.reduce((a, b) => Math.abs(b - target) < Math.abs(a - target) ? b : a);
         args.push('-c:a', 'aac', '-b:a', nearest + 'k');
       } else {
-        args.push('-c:a', 'copy'); // Keep original audio untouched
+        args.push('-c:a', 'copy'); 
       }
       
-      // Multithreading to speed up WASM
       args.push('-threads', '4', outputName);
 
     } else {
+      // ─── AUDIO LOGIC ──────────────────────────────────────────
       outputName = 'output.mp3';
       const idx = Math.round((parseInt(compSlider.value, 10) / 100) * (audioBitrates.length - 1));
       const targetBitrate = audioBitrates[idx] + 'k';
       args = [];
       
-      // --- TIMELINE CONCAT LOGIC (AUDIO) ---
       if (editList.length > 0) {
-        let txt = "";
-        editList.forEach(clip => {
-          txt += `file '${inputName}'\n`;
-          txt += `inpoint ${clip.start.toFixed(3)}\n`;
-          txt += `outpoint ${clip.end.toFixed(3)}\n`;
+        args.push('-i', inputName);
+        let fg = "";
+        let concatStr = "";
+        editList.forEach((clip, i) => {
+          fg += `[0:a]atrim=start=${clip.start.toFixed(3)}:end=${clip.end.toFixed(3)},asetpts=PTS-STARTPTS[a${i}];`;
+          concatStr += `[a${i}]`;
         });
-        await ffmpeg.writeFile('list.txt', txt);
-        args.push('-f', 'concat', '-safe', '0', '-i', 'list.txt');
+        fg += `${concatStr}concat=n=${editList.length}:v=0:a=1[outa]`;
+        
+        args.push('-filter_complex', fg);
+        args.push('-map', '[outa]');
       } else {
         if (hasTrim) args.push('-ss', fmtTimecode(trimValues.start * duration));
         args.push('-i', inputName);
@@ -825,12 +1003,11 @@ processBtn.addEventListener('click', async () => {
           args.push('-t', fmtTimecode(dur));
         }
       }
-      // ---------------------------------------------
 
       args.push('-b:a', targetBitrate, outputName);
     }
 
-    console.log('[Crunch] exec:', args.join(' '));
+    console.log('[semuco] exec:', args.join(' '));
 
     const ret = await ffmpeg.exec(args);
     if (ret !== 0) throw new Error(`FFmpeg exited with code ${ret}`);
@@ -841,7 +1018,7 @@ processBtn.addEventListener('click', async () => {
     outputBlob = new Blob([outData.buffer], { type: mimeMap[outputName] || 'application/octet-stream' });
 
     const ratio = ((1 - outputBlob.size / currentFile.size) * 100).toFixed(1);
-    showStatus(`Done — ${fmtSize(outputBlob.size)} (${ratio > 0 ? ratio + '% smaller' : 'larger than original'})`, 'success');
+    showStatus(`Done! - ${fmtSize(outputBlob.size)} (${ratio > 0 ? ratio + '% smaller' : 'larger than original'})`, 'success');
     downloadBtn.classList.remove('hidden');
     reuseBtn.classList.remove('hidden');
 
@@ -851,7 +1028,7 @@ processBtn.addEventListener('click', async () => {
     try { await ffmpeg.deleteFile('list.txt'); } catch (_) {}
 
   } catch (err) {
-    console.error('[Crunch] Processing error:', err);
+    console.error('[semuco] Processing error:', err);
     showStatus('Error: ' + err.message, 'error');
   } finally {
     processBtn.textContent = '⚙ Process';
@@ -880,6 +1057,14 @@ reuseBtn.addEventListener('click', () => {
   const newFile = new File([outputBlob], base + '_crunched' + ext, { type: outputBlob.type });
   handleFile(newFile);
 });
+
+// ── Theme Switcher ──────────────────────────────────────────────
+const themeSelect = $('themeSelect');
+if (themeSelect) {
+  themeSelect.addEventListener('change', (e) => {
+    document.documentElement.setAttribute('data-theme', e.target.value);
+  });
+}
 
 </script>
 </body>
