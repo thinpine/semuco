@@ -1,9 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<link rel="icon" type="image/x-icon" href="favicon.ico">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<meta name="robots" content="index, follow, max-snippet:-1">
+
+<link rel="icon" type="image/x-icon" href="favicon.ico">
 <meta name="google-site-verification" content="08tGYMinOEBMn8K2sKo07TCliqUldpHLrcjjA8SnwVY" />
 <title>semuco - Media Compressor & Editor</title>
 <meta name="description" content="A free, serverless media compressor and editor. Compress MP4, MP3, and other formats locally in your browser using WebAssembly. No registration, no file uploads required.">
@@ -282,14 +285,14 @@ select { box-shadow: inset 0 1px 2px rgba(0,0,0,0.1); border: 1px solid var(--bo
     <p>Client-side media compressor &amp; editor. Nothing leaves your device.</p>
   </header>
 
-  <div class="dropzone" id="dropzone">
+  <div class="dropzone" id="dropzone" data-nosnippet>
     <div class="icon">📂</div>
     <div class="primary">Drop a video or audio file here</div>
     <div class="secondary">MP4 · MKV · WEBM · MOV · AVI · MP3 · WAV · OGG · FLAC — up to 2 GB</div>
     <input type="file" id="fileInput" accept="video/*,audio/*,.mkv,.avi,.flac,.ogg,.wav">
   </div>
 
-  <div id="editor" class="hidden">
+  <div id="editor" class="hidden" data-nosnippet>
 
     <div class="file-info" id="fileInfo">
       <span class="name" id="fileName"></span>
