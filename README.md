@@ -10,3 +10,8 @@ semuco is a zero-build-step, vanilla HTML/JS application. It loads local files i
 * **Performance:** Browser WebAssembly is strictly CPU-bound and lacks dedicated hardware encoding (like NVENC or VideoToolbox). Processing will be significantly slower than a native desktop FFmpeg installation. This is mainly a very basic web application to quickly compress already small media files and perform basic trimming/cropping on them. For a more efficient and configurable compression experience, I advise you to use FFmpeg directly on your local: https://ffmpeg.org/
 * **Decoding Overhead:** Highly compressed or massive source formats (such as 4K HEVC/H.265, or even basic screen recordings on devices with high resolution screens) will take considerable time simply to decode before the actual compression phase begins.
 * **Memory Limits:** The application loads files into the browser's virtual memory (MEMFS) for processing. Therefore, extremely large files (e.g., >2GB) may crash the tab or hit memory allocation limits depending on your device's available RAM.
+
+## Acknowledgments
+This project is made possible by the following open-source libraries:
+* **[FFmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm):** Core WebAssembly port of FFmpeg used for all media processing.
+* **[coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker):** Handles Cross-Origin isolation headers (COOP/COEP). This enforces a secure browser context, allowing WebAssembly to safely allocate the large memory buffers required for video editing
