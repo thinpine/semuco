@@ -201,6 +201,64 @@ header p{color:var(--text-dim);font-size:.85rem;margin-left:auto;text-align:righ
 .crop-rect{position:absolute;border:2px dashed #fff;outline: 1px solid #000; box-shadow:0 0 0 9999px rgba(0,0,0,.4);z-index:6;pointer-events:none}
 .crop-dims{position:absolute;bottom:6px;right:6px;background:linear-gradient(to bottom, rgba(255,255,255,0.9), rgba(220,220,220,0.9));color:#000;font-family:var(--mono);font-size:.7rem;font-weight:bold;padding:2px 6px;border:1px solid #999;border-radius:3px;z-index:7; box-shadow: 0 1px 3px rgba(0,0,0,0.3);}
 
+/* Tooltips */
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--border-hi);
+  color: var(--bg-card);
+  font-size: 0.65rem;
+  font-weight: bold;
+  font-family: var(--sans);
+  margin-left: 6px;
+  cursor: help;
+  position: relative;
+  outline: none;
+  box-shadow: var(--shadow-light);
+}
+.info-icon .tooltip {
+  position: absolute;
+  bottom: 150%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: var(--bg-card);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: normal;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+  pointer-events: none;
+  box-shadow: var(--shadow-dark);
+  z-index: 10;
+}
+.info-icon .tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: var(--text) transparent transparent transparent;
+}
+.info-icon:hover .tooltip,
+.info-icon:focus .tooltip {
+  opacity: 1;
+  visibility: visible;
+  bottom: 130%;
+}
+@media(max-width: 400px) {
+  .info-icon .tooltip { white-space: normal; width: 200px; }
+}
+
 /* Sliders */
 .slider-group{margin-bottom:1rem}
 .slider-group label{display:flex;justify-content:space-between;font-size:.85rem;font-weight:700;margin-bottom:.4rem}
@@ -323,9 +381,16 @@ select { box-shadow: inset 0 1px 2px rgba(0,0,0,0.1); border: 1px solid var(--bo
       <h2>Compression <span class="badge" id="codecBadge">H.264</span></h2>
       
       <div class="slider-group">
-        <label>Compression Level <span id="compPctVal">50%</span></label>
-        <input type="range" id="compSlider" min="0" max="100" value="50">
+        <label style="display:flex; align-items:center;">
+          Compression Level
+          <span class="info-icon" tabindex="0">i
+            <span class="tooltip">Size decrease is estimated using a baseline 23 CRF and may be inaccurate depending on the source.</span>
+          </span>
+          <span id="compPctVal" style="margin-left:auto;">~71% est. size</span>
+        </label>
+        <input type="range" id="compSlider" min="0" max="51" value="26">
         <div id="compExactVal" style="font-family:var(--mono); font-size:.75rem; color:var(--text-dim); text-align:right; margin-top:.35rem;">(CRF: 26)</div>
+        <div id="crfWarning" class="hidden" style="font-size:.75rem; font-weight:700; text-align:right; margin-top:.25rem; transition: opacity 0.2s;"></div>
       </div>
       
       <div class="slider-group" id="fpsGroup">
@@ -431,7 +496,8 @@ const videoEl       = $('videoEl');
 const audioEl       = $('audioEl');
 const compSlider    = $('compSlider');
 const compPctVal    = $('compPctVal');
-const compExactVal  = $('compExactVal');
+const compExactVal  = $('compExactVal')
+const crfWarning    = $('crfWarning');
 const codecBadge    = $('codecBadge');
 const stripAudioRow = $('stripAudioRow');
 const stripAudio    = $('stripAudio');
@@ -610,7 +676,7 @@ function handleFile(file) {
   cropModeBtn.classList.toggle('hidden', mediaType === 'audio');
   stripAudioRow.classList.toggle('hidden', mediaType === 'audio');
 
-  compSlider.value = 50;
+  compSlider.value = 26;
   updateCompressionUI();
 
   const previewURL = URL.createObjectURL(file);
@@ -676,7 +742,7 @@ removeBtn.addEventListener('click', () => {
   cropInfo.classList.add('hidden');
   
   // 3. Reset Sliders & Toggles
-  compSlider.value = 50;
+  compSlider.value = 26;
   updateCompressionUI();
   fpsSelect.value = 'source';
   speedSelect.value = 'regular';
@@ -701,14 +767,38 @@ document.querySelectorAll('#modeToggle button').forEach(b =>
 // ── Compression Slider Logic ────────────────────────────────────
 function updateCompressionUI() {
   const val = parseInt(compSlider.value, 10);
-  compPctVal.textContent = val + '%';
   
   if (mediaType === 'video') {
-    const crf = Math.round((val / 100) * 51);
+    const crf = val;
+
+    // Logarithmic estimation: Base CRF 23 represents 100% file size
+    // A difference of 6 CRF halves or doubles the bitrate
+    const sizePct = Math.round(Math.pow(2, (23 - crf) / 6) * 100);
+
+    compPctVal.textContent = `~${sizePct}% est. size`;
     compExactVal.textContent = `(CRF: ${crf})`;
+
+    // Dynamic warning logic
+    if (crf < 18) {
+      crfWarning.textContent = "⚠ Warning: Near-lossless. Output file size may increase significantly.";
+      crfWarning.style.color = "var(--orange)";
+      crfWarning.classList.remove('hidden');
+    } else if (crf > 35) {
+      crfWarning.textContent = "⚠ Warning: High compression. Noticeable visual degradation.";
+      crfWarning.style.color = "var(--red)";
+      crfWarning.classList.remove('hidden');
+    } else {
+      crfWarning.classList.add('hidden');
+    }
+
   } else {
-    const idx = Math.round((val / 100) * (audioBitrates.length - 1));
-    compExactVal.textContent = `(Bitrate: ${audioBitrates[idx]} kbps)`;
+    // Audio logic mapped to the 0-51 scale
+    crfWarning.classList.add('hidden');
+    const idx = Math.round((val / 51) * (audioBitrates.length - 1));
+    const targetBitrate = audioBitrates[idx];
+    
+    compPctVal.textContent = `${targetBitrate} kbps`;
+    compExactVal.textContent = `(Audio Bitrate)`;
   }
 }
 compSlider.addEventListener('input', updateCompressionUI);
@@ -920,7 +1010,7 @@ processBtn.addEventListener('click', async () => {
 
     if (mediaType === 'video') {
       outputName = 'output.mp4';
-      const crf = Math.round((parseInt(compSlider.value, 10) / 100) * 51);
+      const crf = parseInt(compSlider.value, 10);
 
       // Determine Fast profile settings
       const isFast = speedSelect.value === 'fast';
@@ -1023,7 +1113,7 @@ processBtn.addEventListener('click', async () => {
     } else {
       // ─── AUDIO LOGIC ──────────────────────────────────────────
       outputName = 'output.mp3';
-      const idx = Math.round((parseInt(compSlider.value, 10) / 100) * (audioBitrates.length - 1));
+      const idx = Math.round((parseInt(compSlider.value, 10) / 51) * (audioBitrates.length - 1));
       const targetBitrate = audioBitrates[idx] + 'k';
       args = [];
       
