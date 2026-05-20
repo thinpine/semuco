@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>semuco - Media Compressor & Editor</title>
@@ -339,6 +340,14 @@ select { box-shadow: inset 0 1px 2px rgba(0,0,0,0.1); border: 1px solid var(--bo
         </select>
       </div>
 
+      <div class="slider-group" id="speedGroup">
+        <label>Compression Speed</label>
+        <select id="speedSelect" style="width:100%; padding:4px; background:var(--bg-hover); color:var(--text); border:1px solid var(--border); border-radius:4px;">
+          <option value="regular">Regular (Better Compression)</option>
+          <option value="fast">Fast (Ultrafast preset, max 1080p)</option>
+        </select>
+      </div>
+
       <div class="check-row" id="compAudioRow">
         <input type="checkbox" id="compAudioToggle" checked>
         <label for="compAudioToggle">Compress audio too (Sync with video %)</label>
@@ -443,6 +452,10 @@ const statusMsg     = $('statusMsg');
 
 const fpsGroup        = $('fpsGroup');
 const fpsSelect       = $('fpsSelect');
+
+const speedGroup      = $('speedGroup');
+const speedSelect     = $('speedSelect');
+
 const compAudioRow    = $('compAudioRow');
 const compAudioToggle = $('compAudioToggle');
 
@@ -574,6 +587,9 @@ function handleFile(file) {
 
   // Trigger UI changes based on type
   fpsGroup.classList.toggle('hidden', mediaType === 'audio');
+
+  speedGroup.classList.toggle('hidden', mediaType === 'audio');
+
   compAudioRow.classList.toggle('hidden', mediaType === 'audio');
   
   // Fast probe to set sourceAudioBitrate
@@ -658,6 +674,7 @@ removeBtn.addEventListener('click', () => {
   compSlider.value = 50;
   updateCompressionUI();
   fpsSelect.value = 'source';
+  speedSelect.value = 'regular';
   compAudioToggle.checked = true;
   stripAudio.checked = false;
 });
@@ -899,6 +916,11 @@ processBtn.addEventListener('click', async () => {
     if (mediaType === 'video') {
       outputName = 'output.mp4';
       const crf = Math.round((parseInt(compSlider.value, 10) / 100) * 51);
+
+      // Determine Fast profile settings
+      const isFast = speedSelect.value === 'fast';
+      const presetType = isFast ? 'ultrafast' : 'fast';
+      
       args = [];
 
       // Pre-calculate crop string if needed
@@ -936,11 +958,20 @@ processBtn.addEventListener('click', async () => {
         // Concat all streams
         fg += `${concatStr}concat=n=${editList.length}:v=1:a=${hasA ? 1 : 0}[outv]${hasA ? '[outa]' : ''}`;
 
-        // Append crop to the end of the concat chain if needed
-        if (hasCrop) fg += `;[outv]${cropStr}[finalv]`;
+        
+
+        // Gather all visual filters
+        let postFilters = [];
+        if (hasCrop) postFilters.push(cropStr);
+        if (isFast) postFilters.push("scale='min(1920,iw)':-2"); // Cap at 1080p if Fast mode
+
+        // Append filters to the end of the concat chain
+        if (postFilters.length > 0) {
+          fg += `;[outv]${postFilters.join(',')}[finalv]`;
+        }
 
         args.push('-filter_complex', fg);
-        args.push('-map', hasCrop ? '[finalv]' : '[outv]');
+        args.push('-map', postFilters.length > 0 ? '[finalv]' : '[outv]');
         if (hasA) args.push('-map', '[outa]');
 
       } else {
@@ -951,11 +982,19 @@ processBtn.addEventListener('click', async () => {
           const dur = (trimValues.end - trimValues.start) * duration;
           args.push('-t', fmtTimecode(dur));
         }
-        if (hasCrop) args.push('-vf', cropStr);
+
+        let standardFilters = [];
+        if (hasCrop) standardFilters.push(cropStr);
+        if (isFast) standardFilters.push("scale='min(1920,iw)':-2");
+        
+        if (standardFilters.length > 0) {
+          args.push('-vf', standardFilters.join(','));
+        }
       }
       // ---------------------------------------------------------
 
-      args.push('-c:v', 'libx264', '-crf', String(crf), '-preset', 'fast');
+      // Use the dynamically selected preset
+      args.push('-c:v', 'libx264', '-crf', String(crf), '-preset', presetType);
 
       // 1. FPS Configuration
       if (fpsSelect.value !== 'source') {
@@ -1061,6 +1100,15 @@ reuseBtn.addEventListener('click', () => {
 // ── Theme Switcher ──────────────────────────────────────────────
 const themeSelect = $('themeSelect');
 if (themeSelect) {
+  // Detect system preference and calculate default
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const defaultTheme = isDark ? 'ego' : (Math.random() < 0.5 ? 'aero' : 'eco');
+  
+  // Apply the calculated default on load
+  document.documentElement.setAttribute('data-theme', defaultTheme);
+  themeSelect.value = defaultTheme;
+
+  // Listen for manual user changes
   themeSelect.addEventListener('change', (e) => {
     document.documentElement.setAttribute('data-theme', e.target.value);
   });
