@@ -1,6 +1,7 @@
 # semuco
 
-**Se(rverless)Mu(ltimedia)Co(mpression)**: A simple frontend to compress media files with FFmpeg. It doesn't use any backend server, handling everything locally in your browser via WebAssembly.
+**Se(rverless)Mu(ltimedia)Co(mpression)**: A simple frontend to compress media files with FFmpeg. It doesn't use any backend server, handling everything locally in your browser via WebAssembly. 
+Github Pages URL: https://thinpine.github.io/semuco/
 
 ## Architecture & Design
 semuco is a zero-build-step, vanilla HTML/JS application. It loads local files into an isolated sandbox using a background Web Worker (`worker.js`) to prevent UI freezing. The core processing is driven by the FFmpeg WebAssembly port (`@ffmpeg/ffmpeg`). To enable multi-threading on static hosts like GitHub Pages, the app utilizes `coi-serviceworker.js` to automatically inject `COOP` and `COEP` security headers, satisfying browser `SharedArrayBuffer` requirements without server-side configuration.
